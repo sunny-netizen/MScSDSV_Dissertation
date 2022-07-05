@@ -1,0 +1,354 @@
+---
+title: "ESS"
+author: "Yun Zhao"
+date: "26/06/2022"
+output: html_document
+---
+
+### Load Packages
+install.packages("here")
+install.packages("dplyr")
+install.packages("tidyr")
+install.packages("tidyverse")
+install.packages("leaflet")
+install.packages("sf")
+
+
+
+```{r echo = FALSE}
+library(here)
+library(dplyr) # data manipulation
+library(tidyr) # data manipulation
+library(tidyverse) # data manipulation
+library(leaflet) # interactive plotting
+library(sf) # spatial 
+install.packages("naniar")
+library(naniar)
+library(DDIwR)
+library(haven)
+#install.packages("janitor")
+library(janitor)
+#install.packages("dismo")
+library(dismo)
+#install.packages("deldir")
+library(deldir)
+```
+
+```{r eval= FALSE, echo= FALSE}
+#DDIwR::convert(here::here("Data/ESS9MDWe03.1.stata/ESS9MDWe03.1_F1.dta"), to = "Excel")
+
+ess9multi <- read_dta("Data/ESS9MDWe03.1.stata/ESS9MDWe03.1_F1.dta") %>%
+  dplyr::select(c(0:10))
+
+sample(ess9multi, 10)
+```
+
+Novembre Genetics
+https://raw.githubusercontent.com/NovembreLab/Novembre_etal_2008_misc/master/files/PCA.txt
+```{r echo = FALSE}
+pca <- read.delim(here::here("Data/NovPCA-20220622.txt")) 
+
+samples <- pca %>% dplyr::select(c(1:2))
+
+nov_colors <- read.delim(here::here("Data/ColorTablePCmap-20220627.txt"), header = F)
+nov_colors[nov_colors == "red#lightblue"] <- "red"
+
+eigs <- read_fwf(here::here("Data/PCAeigs-20220627.txt")) %>%
+  row_to_names(., row_number = 1, remove_row = TRUE, remove_rows_above = TRUE) %>%
+  clean_names() %>%
+  separate(., col = "number_eigvals", into = c("ID","ID2"), sep = " ") %>%
+  select(., !matches("ID2"))
+
+predict <- read.csv(here::here("Data/Nov2008_predict.csv")) %>%
+  rename(predictID = V1, longitude = V2, latitude = V3) %>%
+  merge(., samples, by.x = "predictID", by.y = "ID") %>%
+  merge(., eigs, by.x = "predictID", by.y = "ID") %>%
+  merge(., nov_colors, by.x ="plabels", by.y = "V1", ) %>%
+  rename(novcolor = V2) %>%
+  sf::st_as_sf(., coords = c("longitude","latitude")) %>%
+  st_set_crs(., 4326)
+
+true <- read.csv(here::here("Data/Nov2008_true.csv")) %>%
+  rename(trueID = V1, longitude = V2, latitude = V3) %>%
+  merge(., samples, by.x = "trueID", by.y = "ID") %>%
+  sf::st_as_sf(., coords = c("longitude","latitude")) %>%
+  st_set_crs(., 4326)
+
+predict_sp <- as_Spatial(predict)
+predict_polygons <- voronoi(predict_sp)
+```
+
+
+```{r}
+novpal <- colorFactor(nov_colors$V2, nov_colors$V1, ordered = T)
+
+pca_map <- leaflet() %>%
+  addProviderTiles(providers$Esri.WorldGrayCanvas) %>% #Esri.WorldGrayCanvas
+  #addCircleMarkers(data = true, radius = 5, color = ~novpal(plabels), stroke = T, fillOpacity = 0.1) %>%
+  addCircleMarkers(data = predict, radius = 2, color = ~novpal(plabels), stroke = FALSE, fillOpacity = 1) %>%
+  addPolygons(data = predict_polygons, fillOpacity = 0, color = ~novpal(plabels), weight = 1, smoothFactor = 0.2)
+
+pca_map
+```
+
+
+```{r}
+nov_colors
+predict
+```
+
+###Load ESS Data 
+
+
+ess9
+https://ess-search.nsd.no/CDW/download
+ess9stata
+https://adriandusa.eu/post/rename-ess-variables/
+
+```{r echo = FALSE}
+ess9_ <- read.csv(here::here("Data/ess9-20220626.csv"))
+ess9 <- ess9_ %>%
+  dplyr::select(-matches("name"), 
+                -matches("essround"),
+                -matches("edition"),
+                -matches("proddate"),
+                -matches("idno"),
+                -matches("dweight"),
+                -matches("pspwght"),
+                -matches("pweight")) %>%
+  replace_with_na_all(condition = ~.x == 7) %>%
+  group_by(region, na.rm=TRUE) %>%
+  summarise(cntry = cntry, across(regunit:impfun, ~ mean(.x, na.rm=TRUE))) %>%
+  ungroup() %>%
+  distinct()
+```
+
+###Load NUTS Data and Merge
+
+nuts 2021, 20M
+https://ec.europa.eu/eurostat/web/gisco/geodata/reference-data/administrative-units-statistical-units/nuts
+
+About nuts 
+https://ec.europa.eu/eurostat/web/nuts/background
+1500 NUTS regions = 92 NUTS 1 + 242 regions NUTS 2 + 1166 regions NUTS 3 
+
+```{r echo = FALSE}
+nuts <- st_read(here::here("Data/NUTS_RG_20M_2021_4326-20220626.geojson"))
+ess9_nuts <- merge(x = nuts, y = ess9, by.x = "NUTS_ID", by.y = "region") #all.x=TRUE
+#ess9_nuts_tidy <- ess9_nuts %>% pivot_longer(cols = ipcrtiv:impfun, names_to = "hvs" )
+
+sample(ess9_nuts, 10)
+```
+
+Data Exploration
+```{r echo = FALSE, eval = FALSE}
+summary(nuts)
+colnames(nuts)
+sample(nuts$NUTS_ID, 10)
+sample(ess9$region, 10)
+nuts %>% count(LEVL_CODE)
+nrow(ess9)
+nrow(nuts)
+nrow(ess9_nuts)
+sample(ess9_nuts, 10)
+colnames(ess9_)    
+colnames(ess9) 
+```
+
+### Subset by Nuts Level
+
+```{r echo = FALSE}
+ess9_nuts1 <- ess9_nuts %>% filter(LEVL_CODE == 1)
+ess9_nuts2 <- ess9_nuts %>% filter(LEVL_CODE == 2)
+ess9_nuts3 <- ess9_nuts %>% filter(LEVL_CODE == 3)
+```
+
+Data Exploration
+```{r echo = FALSE, eval = FALSE}
+unique(ess9_nuts1$LEVL_CODE)
+unique(ess9_nuts2$LEVL_CODE)
+unique(ess9_nuts3$LEVL_CODE)
+nrow(ess9_nuts1)
+nrow(ess9_nuts2)
+nrow(ess9_nuts3)
+```
+
+### ipcrtiv
+```{r echo = FALSE}
+pal <- colorNumeric( palette =  "Greens", domain = 1:8 )
+pal(c(1,2,3,4,5,6,7,8))
+
+results <- leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron, group = "Positron") %>%
+  addPolygons(data = ess9_nuts1, fillColor = ~pal(ipcrtiv), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "NUTS1") %>%
+  addPolygons(data = ess9_nuts2, fillColor = ~pal(ipcrtiv), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "NUTS2") %>%
+  addPolygons(data = ess9_nuts3, fillColor = ~pal(ipcrtiv), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "NUTS3") %>%
+  addLayersControl(
+    baseGroups = c("Positron"),
+    overlayGroups = c("NUTS1", "NUTS2", "NUTS3"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+results
+```
+                                      
+### 21 Human Values
+```{r echo = FALSE}
+
+pal2 <- colorFactor(topo.colors(5), pca$plabels)
+
+results2 <- leaflet(ess9_nuts) %>%
+  addProviderTiles(providers$CartoDB.Positron, group = "Positron") %>%
+  
+  addPolygons(fillColor = ~pal(ipcrtiv), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipcrtiv") %>%
+  addPolygons(fillColor = ~pal(imprich), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "imprich") %>%
+  addPolygons(fillColor = ~pal(ipeqopt), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipeqopt") %>%
+  
+  addPolygons(fillColor = ~pal(ipshabt), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipshabt") %>%
+  addPolygons(fillColor = ~pal(impsafe), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "impsafe") %>%
+  addPolygons(fillColor = ~pal(impdiff), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "impdiff") %>%
+  
+  addPolygons(fillColor = ~pal(ipfrule), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipfrule") %>%
+  addPolygons(fillColor = ~pal(ipudrst), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipudrst") %>%
+  addPolygons(fillColor = ~pal(ipmodst), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipmodst") %>%
+  
+  addPolygons(fillColor = ~pal(ipgdtim), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipgdtim") %>%
+  addPolygons(fillColor = ~pal(impfree), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "impfree") %>%
+  addPolygons(fillColor = ~pal(iphlppl), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "iphlppl") %>%
+  
+  addPolygons(fillColor = ~pal(ipsuces), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipsuces") %>%
+  addPolygons(fillColor = ~pal(ipstrgv), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipstrgv") %>%
+  addPolygons(fillColor = ~pal(ipadvnt), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipadvnt") %>%
+  
+  addPolygons(fillColor = ~pal(ipbhprp), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "ipbhprp") %>%
+  addPolygons(fillColor = ~pal(iprspot), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "iprspot") %>%
+  addPolygons(fillColor = ~pal(iplylfr), color = "white", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "iplylfr") %>%
+  
+  addPolygons(fillColor = ~pal(impenv), color = "plabels", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "impenv") %>%
+  addPolygons(fillColor = ~pal(imptrad), color = "plabels", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "imptrad") %>%
+  addPolygons(fillColor = ~pal(impfun), color = "plabels", weight = 1, fillOpacity = 0.9, smoothFactor = 0.2, group = "impfun") %>%
+  
+  addCircleMarkers(data = true, radius = 4, color = ~pal2(plabels), stroke = FALSE, fillOpacity = 1, group = "true")%>%
+  addCircleMarkers(data = predict, radius = 4, color = ~pal2(plabels), stroke = FALSE, fillOpacity = 1, group = "predict")%>%
+  
+  addLayersControl(
+    baseGroups = c("Positron"),
+    overlayGroups = c("ipcrtiv", "imprich", "ipeqopt", "ipshabt", "ipeqopt", "impsafe", "impdiff",
+                      "ipfrule", "ipudrst","ipmodst","ipgdtim","impfree", "iphlppl","ipsuces",
+                      "ipstrgv","ipadvnt","ipbhprp","iprspot","iplylfr","impenv", "imptrad", "impfun",
+                      "true", "predict"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+results2
+```
+
+### Map
+https://stackoverflow.com/questions/39621165/filter-data-points-on-a-map-using-r-leaflet-and-shiny-multiple-criterialibrary(data.table)
+```{r echo = FALSE, eval = FALSE}
+shinyApp(
+  ui = fluidPage(
+    sidebarPanel(
+      h5("", width = 2),
+      checkboxGroupInput(
+        inputId = "MatFlag",
+        label = h4("NUTs"),
+        choices = setNames(
+          object = c("NUTS1", "NUTS2", "NUTS3"),
+          nm = c("NUTS1", "NUTS2", "NUTS3")
+          ),
+        ),
+        checkboxGroupInput(
+          inputId = "AppFlag",
+          label = h4("Human Value Scale"),
+          choices = setNames(
+            object = c(
+              "ipcrtiv",
+              "imprich",
+              "ipeqopt",
+              "ipshabt",
+              "impsafe",
+              "impdiff",
+              "ipfrule",
+              "ipudrst",
+              "ipmodst",
+              "ipgdtim",
+              "impfree",
+              "iphlppl",
+              "ipsuces",
+              "ipstrgv",
+              "ipadvnt",
+              "ipbhprp",
+              "iprspot",
+              "iplylfr",
+              "impenv",
+              "imptrad",
+              "impfun"
+            ),
+            nm = c(
+              "ipcrtiv",
+              "imprich",
+              "ipeqopt",
+              "ipshabt",
+              "impsafe",
+              "impdiff",
+              "ipfrule",
+              "ipudrst",
+              "ipmodst",
+              "ipgdtim",
+              "impfree",
+              "iphlppl",
+              "ipsuces",
+              "ipstrgv",
+              "ipadvnt",
+              "ipbhprp",
+              "iprspot",
+              "iplylfr",
+              "impenv",
+              "imptrad",
+              "impfun"
+            )
+          ),
+        ),
+               position="left"),
+  #App mainPanel content and styles
+  mainPanel(fluidRow(leafletOutput(outputId="lmap")))
+),
+
+  
+  server = function(input, output) {
+  #Build leaflet map
+  lmap <- leaflet(data=ess9_nuts)%>%
+    addProviderTiles("Stamen.TonerLite", 
+                     options =providerTileOptions(noWrap = TRUE)) #%>%
+   fitBounds(~min(-40), ~min(18), ~max(100), ~max(72))
+   
+  #Filter data
+  datFilt <- reactive({
+    MatSearch <- paste0(c('xxx',input$MatFlag),collapse = "|")
+    MatSearch <- gsub(",","|",MatSearch)
+    ess9_nuts_tidy[grepl(MatSearch,"LEVL_CODE") & "hvs" %in% input$AppFlag]
+  })
+  
+  #Add markers based on selected flags
+  observe({
+    if(nrow(datFilt())==0) {
+      print("Nothing selected")
+      leafletProxy("lmap") %>%
+        clearMarkerClusters()
+    } else { #print(paste0("Selected: ", unique(input$InFlags&input$InFlags2)))
+      print("Something Selected")
+      leafletProxy("lmap", data=datFilt()) %>% 
+        clearMarkerClusters() %>% 
+        addPolygons( fillColor = ~pal(datFilt), color = "white", weight = 1,
+                     fillOpacity = 0.7, smoothFactor = 0.2)
+    }
+  }) 
+  
+  output$lmap <- renderLeaflet(lmap)
+}
+
+
+)
+
+```
