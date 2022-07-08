@@ -1,0 +1,506 @@
+
+Packages
+```{r}
+#install.packages("pgirmess")
+library(ggplot2)
+library(igraph)
+library(here)
+library(visNetwork)
+library(networkD3)
+library(RColorBrewer)
+```
+
+# Hierarchical Tree Computations
+Setup
+```{r}
+#Let us select the important jumps to plot the tree
+v_jumps <- c(25,26,32,33)
+length(v_jumps)
+
+path_res <- paste0("/Users/yun/Documents/CASA/MScSDSV_Dissertation/run_spercolation_outputs/membTables/")
+path_data=path_res
+path_plots <- paste0("/Users/yun/Documents/CASA/MScSDSV_Dissertation/tree_outputs/")
+#dir.create(path_plots)
+
+file_name <- "membership_p"
+
+#File for results of full tree
+file_tree <- paste0(path_plots,"Full_tree.txt")
+```
+Encapsulated Functions
+```{r}
+
+subset_clusters <- function() {
+  # selecting the jump in the index
+    i=v_jumps[i_level]
+    print(paste0("level =",i_level," and d=",i))
+    
+    # set parent2 as a vector of 0
+    parent2=c(0)
+    
+    # path to the file of the selected jump
+    file_data <- paste(path_data,file_name,i,".txt",sep="")
+    # read that file, creating a table
+    M_data <- read.table(file_data,sep=",",header=TRUE)
+    #head(M_data)
+    dim(M_data)
+    
+    #create a variable named for the table's jump
+    nam <- paste0("M_data", i_level)
+    #assigns the table "M_data" to the variable "nam"
+    assign(nam, M_data)
+    #this gives the first level of the tree. Let us construct the full tree and subset it afterwards
+    g <- graph.data.frame(M_data)
+    #plot(g,layout=layout_as_tree)
+    
+    ##### so that we can see something, let us select clusters bigger than 2
+    ### first identify cluster bigger than 2 by:
+    # make a smaller table, a subset of the jump table, with just the cluster ids
+    M_table <- table(M_data$cluster_id) 
+    # make table into dataframe. columns: cluster id, number of occurrences of that cluster 
+    m <- data.frame(cluster_id=names(M_table),n_points=as.vector(M_table))
+    # extract IDs of clusters above 2 LSOAs from smaller table
+    m_sub <- m[m$n_points>=2,]
+    
+    # now subset the clusters bigger than two from the main jump table, using the smaller table
+    M_sub <- M_data[M_data$cluster_id %in% m_sub$cluster_id,]
+    dim(M_sub)
+    #reassign name with this subset
+    nam <- paste("M_sub", i_level, sep = "")
+    assign(nam, M_sub)
+    
+    # Create a table of cluster IDs from the subsetted bigger table. (should end up the same as smaller table)
+    M_sub_table <- table(M_sub$cluster_id)
+    head(M_sub_table)
+    # make table into dataframe. columns: cluster id, number of occurrences of that cluster 
+    m_sub_table <- data.frame(cluster_id=names(M_sub_table),n_points=as.vector(M_sub_table))
+    head(m_sub_table)
+    #reassign name with this subset
+    nam <- paste("node_weight", i_level, sep = "")
+    assign(nam, m_sub_table)
+    
+    # Make a vector of cluster Ids in the dataframe;
+    v_list <- as.vector(m_sub_table$cluster_id)
+    nam <- paste("v_list", i_level, sep = "")
+    assign(nam, v_list)
+    
+    # number of clusters in the vector
+    n_clusts <- length(M_sub_table)
+    nam <- paste("n_clusts", i_level, sep = "")
+    assign(nam, n_clusts)
+    # make graph of clusters > 2
+    g_sub <- graph.data.frame(M_sub,directed=F)
+    nam <- paste("g_sub", i_level, sep = "")
+    assign(nam, g_sub)
+    #plot(g_sub,layout=layout_as_tree)
+}
+
+compute_from_roots <- function() {
+  
+
+    #Building from the bottom, from the smaller clusters
+    if(i==v_jumps[1])
+    {
+      #plot(g_sub,layout=layout_as_tree)#,vertex.size=V(g_sub)$size,vertex.label=NA)
+      #plot(g_sub)#,vertex.size=degree(g_sub))  
+      
+      #bind columns: bind first jump thresholds to the two columns of the df
+      Full_tree <- cbind(i,M_sub[ ,c(2,1)]) # M_sub[ c(1,2)] vs. M_sub[ ,c(1,2)]?
+     
+    }else{
+      # bind subsequent jump thresholds to the two columns of their df
+      new_bit <- cbind(i,M_sub[ ,c(2,1)])  
+      # add subsequent jumps to the original tree
+      Full_tree <- rbind(Full_tree,new_bit) 
+      
+      parent_child ##########function
+      create_graph ##########function
+      
+    }
+    i_level=i_level+1
+  } 
+
+### 
+
+parent_child <- function() {
+      ### names regarding cluster one level down/before/smaller
+      n_clust_l1 <- get(paste("n_clusts", i_level - 1 , sep=""))
+      g_lev1 <- get(paste("g_sub", i_level - 1 , sep=""))
+      v_list_lev1 <- get(paste("v_list",i_level-1,sep=""))
+      # adjacent vertices = one level down/before/smaller
+      m_adj <- adjacent_vertices(g_lev1, v_list_lev1, mode ="all")
+      
+      # Nodes 
+      v_tmp2 <- M_sub$node_id #M_sub$id_point
+    
+      # for each cluster before mine, i.e. with a lower threshold than mine
+      for(j in 1:n_clust_l1) 
+      {
+        v_name1 <- v_list_lev1[j]
+        v_tmp1 <- m_adj[[j]]$name
+        v_inter <- intersect(v_tmp1,v_tmp2)
+        
+        if(length(v_inter)==0)
+        {
+          print("!!!!there was a mistake") # for year=",y_loop," and p_ds=",i," for cluster j=",j)
+        }else{
+          id_parent <- M_sub[ M_sub$node_id==v_inter[1], ]$cluster_id #M_sub$id_point, id_cluster
+          if(parent2[1]==0)
+          {
+            parent2=c(id_parent)
+            child2=c(v_name1)
+          }else{
+            parent2=c(parent2,id_parent)
+            child2=c(child2,v_name1)
+          }
+        }
+        
+      }#end of for(j in 2:n_clusts[i_level-1])
+}
+
+create_graph <- function() {
+  if(i_level==2)
+      {
+        # we have issue with the fact that parent and child are called the same
+        # to avoid problems at this level, change the name of the last level
+        parent22=paste("L3_",parent2,sep="")
+        tree_2 <- data.frame(level1 = parent22, clusters = child2)
+        g2 <- graph.data.frame(tree_2,directed=F)
+        
+        #we need to assign the real weight to the nodes now
+        #Let us obtain the position of the children
+        v=match(V(g2)$name,child2)
+        v_pos_nn=which(!is.na(v))
+        V(g2)[v_pos_nn]$name
+        
+        #Assign weight from node_weight list
+        for(i_pos in 1:length(v_pos_nn))
+        {
+          V(g2)[v_pos_nn[i_pos]]$size=node_weight1$n_points[i_pos]  
+        }
+        
+        #Now let us assign weight to the parents
+        #Need to match the name of the node with the name in the list
+        v_pos_n=which(is.na(v))
+        #V(g2)[v_pos_n]$name
+        mod_names_list=paste("L3_",node_weight2$id_cluster,sep="")
+        v_pos_list=match(V(g2)[v_pos_n]$name,mod_names_list)
+        for(i_pos in 1:length(v_pos_n))
+        {
+          V(g2)[v_pos_n[i_pos]]$size=node_weight2$n_points[v_pos_list[i_pos]]
+        }
+      
+        
+        V(g_sub1)$size <- degree(g_sub1)
+        g_u2 <- igraph::union(g_sub1,g2)
+        #the attribute size is split in size_1 and size_2 with null values
+        #V(g_u2)$size_2
+        #need to properly reassign it
+        V(g_u2)$size=V(g_u2)$size_1
+        v_pos_NA1 <- which(is.na(V(g_u2)$size_1))
+        V(g_u2)$size[v_pos_NA1]=V(g_u2)$size_2[v_pos_NA1]
+        
+        g_tree2 <- g_u2
+        #plot(g_u2,vertex.size=V(g_u2)$size)
+        #plot(g_tree2,vertex.size=V(g_tree2)$size,layout=layout_as_tree(g_tree2,root = parent22))
+        g_old <- g_tree2
+      }else{
+        
+        parent32=paste("L",i_level+1,"_",parent2,sep="")
+        child32=paste("L",i_level,"_",child2,sep="")
+        tree_3 <- data.frame(level1 = parent32, clusters = child32)
+        g3 <- graph.data.frame(tree_3,directed=F)
+        #we need to assign sizes to nodes
+        #Let us start with child nodes
+        node_weight_child <- get(paste("node_weight",i_level-1,sep=""))
+        child_names_list=paste("L",i_level,"_",node_weight_child$id_cluster,sep="")
+        v=match(V(g3)$name,child_names_list)
+        v_pos_list=which(!is.na(v))
+        #length(v_pos_list)
+        #V(g3)$name[v_pos_list]
+        for(i_pos in 1:length(v_pos_list))
+        {
+          V(g3)[v_pos_list[i_pos]]$size=node_weight_child$n_points[i_pos]
+        }
+        #V(g3)$name
+        #V(g3)$size
+        #Now let us put the weights of the parents
+        node_weight_parent <- get(paste("node_weight",i_level,sep=""))
+        parent_names_list=paste("L",i_level+1,"_",node_weight_parent$id_cluster,sep="")
+        #node_weight_parent$id_cluster
+        v=match(V(g3)$name,parent_names_list)
+        v_pos_list=which(!is.na(v))
+        #length(v_pos_list)
+        #V(g3)$name[v_pos_list]
+        #Now need to get the position for the list
+        v2=v=match(parent_names_list,V(g3)$name)
+        v_in_list=which(!is.na(v))
+        #length(v_pos_list)-length(v_in_list)
+        for(i_pos in 1:length(v_pos_list))
+        {
+          V(g3)[v_pos_list[i_pos]]$size=node_weight_parent$n_points[v_in_list[i_pos]]
+        }
+        #V(g3)$name
+        #V(g3)$size
+        #node_weight_parent$n_points[v_in_list]
+        #node_weight_child$n_points
+        
+        nam <- paste("g_u", i_level, sep = "")
+        assign(nam, g3)
+        
+        #plot(g3,layout=layout_as_tree(g3,root=parent32))
+        #join with previous graph g_sub1 or i_level-1 
+        #identical_graphs(g_tree2,g_old)
+        g_new <- igraph::union(g_old,g3)
+        #V(g_old)$size
+        #V(g3)$size
+        #V(g_new)$size
+        
+        #the attribute size is split in size_1 and size_2 with null values
+        #V(g_new)$size_1
+        #need to properly reassign it
+        V(g_new)$size=V(g_new)$size_1
+        v_pos_NA1 <- which(is.na(V(g_new)$size_1))
+        V(g_new)$size[v_pos_NA1]=V(g_new)$size_2[v_pos_NA1]
+        V(g_new)$size
+        
+        nam <- paste("g_tree", i_level, sep = "")
+        assign(nam, g_new)
+        # if(i_level<4)
+        # {
+        #   plot(g_new,vertex.size=V(g_new)$size/2,vertex.label=NA)
+        #   title(paste('Tree at level ',i_level+1," year ",y_loop,sep=""))
+        #   plot(g_new,vertex.size=V(g_new)$size/2,vertex.label=NA,layout=layout_as_tree(g_new,root = parent32))
+        #   title(paste("Firms hierarchical tree, London ",y_loop,"\n",i_level+1," levels",sep=""))
+        # }else{
+        #   plot(g_new,vertex.size=log(V(g_new)$size),vertex.label=NA)
+        #   title(paste('Tree at level ',i_level+1," year ",y_loop,sep=""))
+        #   plot(g_new,vertex.size=log(V(g_new)$size),vertex.label=NA,layout=layout_as_tree(g_new,root = parent32))
+        #   title(paste("Firms hierarchical tree, London ",y_loop,"\n",i_level+1," levels",sep=""))
+        # }
+        if(i==v_jumps[length(v_jumps)]) # at final level
+        {
+          print(paste0('we have finished'))
+          #let us save image
+          file_plot<- paste0(path_plots,'tree_London.png')
+          png(file_plot,height=850,width=1000)
+          plot(g_new,vertex.size=log(V(g_new)$size),vertex.label=NA,layout=layout_as_tree(g_new,root = parent32))
+          title(paste("Hierarchical tree, London \n",i_level+1," levels",sep=""),cex.main=2)
+          dev.off()
+          
+          #let us save the graph
+          file_graph <- paste0(path_res,"tree_graph.txt")
+          write_graph(g_new, file_graph, format = "ncol") 
+        }
+        
+        #plot(g_new,vertex.size=degree(g_new)/2,layout=layout_as_tree(g_new,root = parent32))
+        #title(paste('Tree at level ',i_level+1,sep=""))
+        #plot(g_tree3,vertex.size=degree(g_new),layout=layout_as_tree(g_tree3,root = parent32,mode="all"))
+        g_old <- g_new
+        
+        
+
+      }
+}
+
+#####
+
+
+
+```
+Run Computations
+```{r}
+hierarchical_tree <- function() {
+  i_level=1
+  for(i in v_jumps) {
+    subset_clusters ##########function
+    compute_from_roots ##########function
+  }
+}
+```
+```{r}
+# save Full_tree info
+write.table(Full_tree,file_tree,row.names=FALSE,col.names=c('p_ds','ID_cluster','ID_points'))
+
+#assign tree to year
+nam <- paste0("g_tree")
+assign(nam, g_new)
+
+#let us save the graph
+file_graph <- paste0(path_res,"tree_graph.txt")
+write_graph(g_new, file_graph, format = "ncol") 
+```
+
+
+# Plot Tree
+```{r}
+#file with the tree network nodes named after levels and clusters
+file_tree_graph <- paste0(path_res,"Full_tree.txt")
+#read the file as graph
+g_tree <- read_graph(file_tree_graph, format = "ncol")
+
+#let us get the parent node
+tail(V(g_tree))
+v_dim=length(V(g_tree))
+tail(as_edgelist(g_tree))
+g_parent=as.character(as_edgelist(g_tree)[v_dim-1,][2])
+  
+  #let us plot the trees removing nodes with low degree
+  #or with no children
+  tail(as_edgelist(g_tree))
+  V(g_tree)$colour="gray"
+  #plot(g_tree,vertex.size=log(V(g_tree)$size),vertex.label=NA,layout=layout_as_tree(g_tree,root = g_parent))
+  plot(g_tree,vertex.size=1,vertex.label=NA,layout=layout_as_tree(g_tree,root = g_parent),
+       vertex.color=V(g_tree)$colour)
+  title("Hierarchical tree, London ",cex.main=2)
+  
+  deg_ver=degree(g_tree,V(g_tree))
+  #max(deg_ver)
+  #min(deg_ver)
+  #for individual degrees use deg_ver[[i]] for vertex in position i in V(g_tree)[i]
+  
+  #in order to plot the nodes with the same colours as the maps, we need at each level define the colours again
+  top10 = colors()[c(553,29,258,654,91,115,456,48,102,40)]
+  
+  
+  #let us get the characteristics of the nodes
+  i_level=1
+  for(i_tmp in v_jumps)
+  {
+    i_tmp=v_jumps[i_level]
+    #let us get the n. of intersections for the clusters 
+    #this file has already been sorted
+    file_n_clusts <- paste0("Results/n_clusters_p",i_tmp,".txt")
+    data_clusters <- read.table(file_n_clusts, header = T)
+    tail(data_clusters)
+    dim(data_clusters)
+    dat_clusts <- data_clusters[data_clusters$n_points>=50,]
+    tail(dat_clusts)
+    dim(dat_clusts)
+    d_clusts = dim(dat_clusts)[1]
+    
+    #firs we need to match the name of the nodes in the tree with the clusters 
+    if(i_level>=2)
+    {
+      dat_clusts$id_Tree=paste0("L",i_level+1,"_",dat_clusts$id_cluster)
+    }else{
+      dat_clusts$id_Tree=dat_clusts$id_cluster
+    }
+    head(dat_clusts)
+    if(d_clusts<=10)
+    {
+      #assign colours to top 15
+      dat_clusts$colour=top10[1:d_clusts]
+      head(dat_clusts)
+      
+      v=match(V(g_tree)$name,as.character(dat_clusts$id_Tree))
+      v_pos_nn=which(!is.na(v))
+      V(g_tree)[v_pos_nn]$name
+      for(i_pos in 1:length(v_pos_nn))
+      {
+        #we need to find 
+        #i_pos=1
+        tmp_data=dat_clusts[dat_clusts$id_Tree==V(g_tree)[v_pos_nn[i_pos]]$name,]
+        V(g_tree)[v_pos_nn[i_pos]]$nclusts=tmp_data$n_points
+        V(g_tree)[v_pos_nn[i_pos]]$colour=tmp_data$colour
+      }
+      V(g_tree)[v_pos_nn]$nclusts
+      V(g_tree)[v_pos_nn]$colour
+    }else{
+      #take only the top 15 from data
+      sub_sort=dat_clusts[1:10,]
+      sub_sort$colour=top10
+      
+      v=match(V(g_tree)$name,as.character(sub_sort$id_Tree))
+      v_pos_nn=which(!is.na(v))
+      V(g_tree)[v_pos_nn]$name
+      for(i_pos in 1:length(v_pos_nn))
+      {
+        #we need to find 
+        #i_pos=2
+        tmp_data=sub_sort[sub_sort$id_Tree==V(g_tree)[v_pos_nn[i_pos]]$name,]
+        V(g_tree)[v_pos_nn[i_pos]]$nclusts=tmp_data$n_points
+        V(g_tree)[v_pos_nn[i_pos]]$colour=tmp_data$colour
+      }
+      V(g_tree)[v_pos_nn]$nclusts
+      V(g_tree)[v_pos_nn]$colour
+      
+    }
+    i_level=i_level+1
+    
+  } #end of for(i_tmp in v_jumps)
+  #Now need to add the last level of the tree
+  v=match(V(g_tree)$name,"L15")
+  v_pos_nn=which(!is.na(v))
+  V(g_tree)[v_pos_nn]$name
+  V(g_tree)[v_pos_nn]$nclusts=200000
+  V(g_tree)[v_pos_nn]$colour=top10[1]
+  
+  v_pos_plot=which(!is.na(V(g_tree)$nclusts))
+  V(g_tree)[v_pos_plot]$nclusts
+  V(g_tree)[v_pos_plot]$colour
+  V(g_tree)[v_pos_plot]$name
+  v_x=1:(length(v_pos_plot))
+  v_y=sort(V(g_tree)[v_pos_plot]$nfirms,decreasing = FALSE) 
+  v_y3=v_y[1:(length(v_pos_plot)-6)]
+  #v_y2=sort(V(g_plot)$nfirms,decreasing = FALSE) 
+  plot(v_x,v_y)
+  #now need to subset the graph and take only the ones that have values
+  #--> remove nodes with NA values
+  g_new=induced_subgraph(g_tree, V(g_tree)[v_pos_plot])
+  #check whether is fully connected
+  clusters(g_new)$no
+  #take largest connected component
+  gclust<-clusters(g_new, mode='weak')
+  largestConnectedComponent<-induced.subgraph(g_new, V(g_new)[which(gclust$membership == which.max(gclust$csize))])
+  g_plot=largestConnectedComponent
+  length(V(g_plot))
+  #for visualisation purposes, let us reduce the size of 6 largest ones to see the others
+  V(g_plot)$size_plot=V(g_plot)$nclusts
+  #for 2007 i_max=7, for 2014 i_max=5
+  i_max=10 #this is for the size of the nodes
+  max_nf7=sort(V(g_plot)$nclusts,decreasing = T)[i_max] 
+  n_V_plot=length(V(g_plot))
+  #plot(c(1:n_V_plot),V(g_plot)$nfirms)
+  #plot(c(1:n_V_plot),log(V(g_plot)$nfirms))
+  for(i in 1:n_V_plot)
+  {
+    if(V(g_plot)[i]$nclusts>max_nf7)
+    {
+      print(paste0(V(g_plot)[i]$name," and ",V(g_plot)[i]$nclusts))
+      if(V(g_plot)[i]$name==V(g_plot)[n_V_plot]$name)
+      {
+        V(g_plot)[i]$size_plot=(V(g_plot)[i]$nclusts)*100000
+        print(paste0(V(g_plot)[i]$name," and ",V(g_plot)[i]$nclusts))
+      }else{
+        V(g_plot)[i]$size_plot=(V(g_plot)[i]$nclusts)*500
+      }
+      print(paste0(" but now ",V(g_plot)[i]$size_plot))
+    }
+  }
+  #sort(log(V(g_plot)$nfirms),decreasing = T)
+  #y=sort((V(g_plot)$size_plot)/1200,decreasing = T)
+  #plot(c(1:n_V_plot),y)
+  #plot(g_plot,vertex.size=1,layout=layout_as_tree(g_plot,root = g_parent),vertex.label=NA)
+  
+  v_s=c(3,seq(from=2, to=0.7, by=-0.1))
+  length(v_s)
+  file_plot<- paste(path_plots,'/hier_tree_London.png',sep="")
+  png(file_plot,height=850,width=1000)
+  plot(g_plot,vertex.size=log((V(g_plot)$size_plot))/2.2,vertex.label=NA,
+       layout=layout_as_tree(g_plot,root = g_parent),
+       vertex.color=V(g_plot)$colour)
+  
+  #plot(g_plot,vertex.size=log((V(g_plot)$nfirms))/2,vertex.label=NA,layout=layout_as_tree(g_plot,root = g_parent),vertex.color=V(g_plot)$colour)
+  #plot(g_plot,vertex.size=10,vertex.label=NA,layout=layout_as_tree(g_plot,root = g_parent),vertex.color=V(g_plot)$colour)
+  title("Hierarchical tree, London ",cex.main=2)
+  #legend(title="rank size",'topleft',legend=c(1:15),col=top15,horiz = F,pch = 19, pt.cex = v_s,bty="n",title.adj = 1.9)
+  legend(-1.3,1.2,title="rank size",legend=c(1:10),col=top10,horiz = F,pch = 19, pt.cex = v_s,bty="n",
+         title.adj = 1.9,cex = 1.4) #cex is used to scale size of legend
+  dev.off()
+  
+  
+```
+
+
+
