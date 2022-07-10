@@ -6,60 +6,59 @@ output: html_document
 ---
 
 ### Load Packages
-install.packages("here")
-install.packages("dplyr")
-install.packages("tidyr")
-install.packages("tidyverse")
-install.packages("leaflet")
-install.packages("sf")
-
-
 
 ```{r echo = FALSE}
+#install.packages("here")
 library(here)
+#install.packages("dplyr")
 library(dplyr) # data manipulation
+#install.packages("tidyr")
 library(tidyr) # data manipulation
+#install.packages("tidyverse")
 library(tidyverse) # data manipulation
+#install.packages("leaflet")
 library(leaflet) # interactive plotting
+#install.packages("sf")
 library(sf) # spatial 
-install.packages("naniar")
+#install.packages("naniar")
 library(naniar)
 library(DDIwR)
 library(haven)
 #install.packages("janitor")
 library(janitor)
 #install.packages("dismo")
-library(dismo)
+#library(dismo)
 #install.packages("deldir")
 library(deldir)
+#install.packages("raster")
+#install.packages(c("Rcpp", "rgdal", "sp", "terra", "raster"))
 ```
 
 ```{r eval= FALSE, echo= FALSE}
 #DDIwR::convert(here::here("Data/ESS9MDWe03.1.stata/ESS9MDWe03.1_F1.dta"), to = "Excel")
 
-ess9multi <- read_dta("Data/ESS9MDWe03.1.stata/ESS9MDWe03.1_F1.dta") %>%
-  dplyr::select(c(0:10))
+#ess9multi <- read_dta("Data/ESS9MDWe03.1-20220608.stata/ESS9MDWe03.1_F1.dta") %>%
+ # dplyr::select(c(0:10))
 
-sample(ess9multi, 10)
+#sample(ess9multi, 10)
 ```
 
 Novembre Genetics
 https://raw.githubusercontent.com/NovembreLab/Novembre_etal_2008_misc/master/files/PCA.txt
 ```{r echo = FALSE}
-pca <- read.delim(here::here("Data/NovPCA-20220622.txt")) 
-
+pca <- read.delim(here::here("Data/Nov2008_PCA-20220622.txt")) 
 samples <- pca %>% dplyr::select(c(1:2))
-
+samples
 nov_colors <- read.delim(here::here("Data/ColorTablePCmap-20220627.txt"), header = F)
 nov_colors[nov_colors == "red#lightblue"] <- "red"
 
-eigs <- read_fwf(here::here("Data/PCAeigs-20220627.txt")) %>%
+eigs <- read_fwf(here::here("Data/NovPCAeigs-20220627.txt")) %>% 
   row_to_names(., row_number = 1, remove_row = TRUE, remove_rows_above = TRUE) %>%
   clean_names() %>%
   separate(., col = "number_eigvals", into = c("ID","ID2"), sep = " ") %>%
   select(., !matches("ID2"))
 
-predict <- read.csv(here::here("Data/Nov2008_predict.csv")) %>%
+predict <- read.csv(here::here("Data/Nov2008_predict-20220627.csv")) %>%  
   rename(predictID = V1, longitude = V2, latitude = V3) %>%
   merge(., samples, by.x = "predictID", by.y = "ID") %>%
   merge(., eigs, by.x = "predictID", by.y = "ID") %>%
@@ -68,7 +67,7 @@ predict <- read.csv(here::here("Data/Nov2008_predict.csv")) %>%
   sf::st_as_sf(., coords = c("longitude","latitude")) %>%
   st_set_crs(., 4326)
 
-true <- read.csv(here::here("Data/Nov2008_true.csv")) %>%
+true <- read.csv(here::here("Data/Nov2008_true-20220627.csv")) %>%
   rename(trueID = V1, longitude = V2, latitude = V3) %>%
   merge(., samples, by.x = "trueID", by.y = "ID") %>%
   sf::st_as_sf(., coords = c("longitude","latitude")) %>%
