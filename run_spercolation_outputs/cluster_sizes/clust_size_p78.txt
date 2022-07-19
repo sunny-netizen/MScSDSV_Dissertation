@@ -1,7 +1,0 @@
-cluster_id,cluster_size
-0,4412
-1,94
-2,11
-3,7
-4,3
-5,2

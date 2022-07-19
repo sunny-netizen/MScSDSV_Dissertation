@@ -32,6 +32,9 @@ library(janitor)
 library(deldir)
 #install.packages("raster")
 #install.packages(c("Rcpp", "rgdal", "sp", "terra", "raster"))
+install.packages('visibly')
+#library(col2hex)
+library(visibly)
 ```
 
 ```{r eval= FALSE, echo= FALSE}
@@ -41,16 +44,18 @@ library(deldir)
  # dplyr::select(c(0:10))
 
 #sample(ess9multi, 10)
+
 ```
 
 Novembre Genetics
 https://raw.githubusercontent.com/NovembreLab/Novembre_etal_2008_misc/master/files/PCA.txt
 ```{r echo = FALSE}
 pca <- read.delim(here::here("Data/Nov2008_PCA-20220622.txt")) 
-samples <- pca %>% dplyr::select(c(1:2))
-samples
+#samples <- pca %>% dplyr::select(c(1:2))
+#samples
 nov_colors <- read.delim(here::here("Data/ColorTablePCmap-20220627.txt"), header = F)
 nov_colors[nov_colors == "red#lightblue"] <- "red"
+novcolors = col2hex(nov_colors[1])
 
 eigs <- read_fwf(here::here("Data/NovPCAeigs-20220627.txt")) %>% 
   row_to_names(., row_number = 1, remove_row = TRUE, remove_rows_above = TRUE) %>%
@@ -74,7 +79,7 @@ true <- read.csv(here::here("Data/Nov2008_true-20220627.csv")) %>%
   st_set_crs(., 4326)
 
 predict_sp <- as_Spatial(predict)
-predict_polygons <- voronoi(predict_sp)
+#predict_polygons <- voronoi(predict_sp)
 ```
 
 
@@ -351,3 +356,18 @@ shinyApp(
 )
 
 ```
+#let us save the graph
+#write_graph(g_new, file_graph, format = "ncol")  
+#write_graph(g_tree2, file_graph, format = "ncol") 
+
+
+
+#L1 --> unnamed
+#L3, is level 2
+# 13 jumps, so need 15 levels (bottom and top). j1 - level 2. 
+#can take top 10 or 15 in plot tree. put L15 by hand
+
+#changes to igraph?
+
+# L0 disconnected
+# ask valentina. 

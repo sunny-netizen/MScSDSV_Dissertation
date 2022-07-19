@@ -1,0 +1,164 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "fa87ea97-fcc0-4599-b71d-88a05c216ec3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import networkx as nx\n",
+    "import osmnx as ox\n",
+    "import matplotlib.pyplot as plt\n",
+    "\n",
+    "import tweepy\n",
+    "import configparser"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "id": "6fcae9c3-eb21-45f4-8443-6c16939e15e8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "consumer_key = 'OhodPre22PW05EhvnRMcDhBvW'   #API_Key\n",
+    "consumer_secret = 'a3mj4spvrFsiW2WQ249YLqQdTWZJ2d1fM6tsFpB8qS5E7ui9gL' #API_Key_Secret\n",
+    "bearer_token = 'AAAAAAAAAAAAAAAAAAAAAFJTcwEAAAAA9BqCpM7oqfUOBGY27GqunjvjERY%3Ds5HZgaNtbVN0uGYAjxxFCiLe06t1Q2Kmvtr5xaWH8BM1cGZepe'\n",
+    "access_token = '4819546558-yxe5pPjXBsPF6e11M24dhNaRLS3DNdYS7fPTZ89'\n",
+    "access_token_secret = '3qRpq5mNjIzjDkOFelXiPYWVR21gA1sziNHxeBCkN1gnT'"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "id": "b0a615dc-8a8a-4e14-a457-0b484949345d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "auth = tweepy.OAuth1UserHandler(\n",
+    "   consumer_key, consumer_secret, access_token, access_token_secret\n",
+    ")\n",
+    "\n",
+    "api = tweepy.API(auth)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5f440e4b-dae9-421e-b184-630595e1d79e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "public_tweets = api.home_timeline()\n",
+    "for tweet in public_tweets:\n",
+    "    print(tweet.text)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "26c78f8d-ae37-4fa0-a0db-16568128d2e5",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4452fab8-2165-46e6-9f96-fbac91674c1b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#https://www.youtube.com/watch?v=Lu1nskBkPJU&ab_channel=AISpectrum"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "23ed890b-c6f7-4b69-81e5-c9c6487da382",
+   "metadata": {},
+   "outputs": [
+    {
+     "ename": "KeyError",
+     "evalue": "'twitter'",
+     "output_type": "error",
+     "traceback": [
+      "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+      "\u001b[0;31mKeyError\u001b[0m                                  Traceback (most recent call last)",
+      "\u001b[0;32m/tmp/ipykernel_376/3721959219.py\u001b[0m in \u001b[0;36m<module>\u001b[0;34m\u001b[0m\n\u001b[1;32m      2\u001b[0m \u001b[0mconfig\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mread\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m'config.ini'\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      3\u001b[0m \u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m----> 4\u001b[0;31m \u001b[0mapi_key\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mconfig\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m'twitter'\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m'api_key'\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m      5\u001b[0m \u001b[0mapi_key_secret\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mconfig\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m'twitter'\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m'api_key_secret'\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      6\u001b[0m \u001b[0;34m\u001b[0m\u001b[0m\n",
+      "\u001b[0;32m/opt/conda/envs/sds2021/lib/python3.9/configparser.py\u001b[0m in \u001b[0;36m__getitem__\u001b[0;34m(self, key)\u001b[0m\n\u001b[1;32m    961\u001b[0m     \u001b[0;32mdef\u001b[0m \u001b[0m__getitem__\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mself\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mkey\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m    962\u001b[0m         \u001b[0;32mif\u001b[0m \u001b[0mkey\u001b[0m \u001b[0;34m!=\u001b[0m \u001b[0mself\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdefault_section\u001b[0m \u001b[0;32mand\u001b[0m \u001b[0;32mnot\u001b[0m \u001b[0mself\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mhas_section\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mkey\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m--> 963\u001b[0;31m             \u001b[0;32mraise\u001b[0m \u001b[0mKeyError\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mkey\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m    964\u001b[0m         \u001b[0;32mreturn\u001b[0m \u001b[0mself\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0m_proxies\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0mkey\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m    965\u001b[0m \u001b[0;34m\u001b[0m\u001b[0m\n",
+      "\u001b[0;31mKeyError\u001b[0m: 'twitter'"
+     ]
+    }
+   ],
+   "source": [
+    "config = configparser.ConfigParser()\n",
+    "config.read('config.ini')\n",
+    "\n",
+    "api_key = config['twitter']['api_key']\n",
+    "api_key_secret = config['twitter']['api_key_secret']\n",
+    "\n",
+    "access_token = config['twitter']['access_token']\n",
+    "access_token_secret = config['twitter']['access_token_secret']\n",
+    "\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "a4c70ec0-3e3d-44cd-b5f7-1492ce0d5e14",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "string = 'I  explore language diversity measures across Europe with spatial analysis techniques, such as spatial autocorrelationm, and comparison with network techniques for community detection. I will only use data in aggregate statistics and values. I will look at the language of tweets, not usernames or tweet content. '"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "f0e80587-ec1c-42c1-89c2-6ca634dc28b7",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "313"
+      ]
+     },
+     "execution_count": 18,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "len(string)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.9.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
